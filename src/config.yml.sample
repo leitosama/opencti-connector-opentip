@@ -1,0 +1,33 @@
+opencti:
+  url: 'http://localhost'
+  token: 'ChangeMe'
+
+#connector:
+#  type: 'INTERNAL_ENRICHMENT'
+#  id: 'ChangeMe'
+#  name: 'OpenTIP'
+#  scope: 'StixFile,Artifact,IPv4-Addr,Domain-Name,Url,Hostname'
+#  auto: false
+#  log_level: 'error'
+#  expose_metrics: false
+
+opentip:
+  token: 'ChangeMe'
+#  max_tlp: 'TLP:AMBER'
+#  replace_with_lower_score: false
+  zone_score_red: 90
+  zone_score_orange: 80
+  zone_score_yellow: 40
+  zone_score_green: 10
+
+#  file_create_note_full_report: true
+#  file_upload_unseen_artifacts: false
+#  ip_add_relationships: false
+#  domain_add_relationships: false
+#  url_upload_unseen: false
+
+#  include_attributes_in_note: false
+#  add_categories_labels: true
+#  add_zone_labels: true
+
+  indicator_zones: ['Red', 'Orange', 'Yellow']

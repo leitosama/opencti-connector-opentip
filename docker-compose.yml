@@ -1,0 +1,27 @@
+version: '3'
+services:
+  connector-opentip:
+    image: opencti/connector-opentip:latest
+    environment:
+      - OPENCTI_URL=http://localhost
+      - OPENCTI_TOKEN=ChangeMe
+      - OPENTIP_TOKEN=ChangeMe
+      - OPENTIP_MAX_TLP=TLP:AMBER
+      - OPENTIP_REPLACE_WITH_LOWER_SCORE=false
+      - OPENTIP_ZONE_SCORE_RED=90
+      - OPENTIP_ZONE_SCORE_ORANGE=80
+      - OPENTIP_ZONE_SCORE_YELLOW=40
+      - OPENTIP_ZONE_SCORE_GREEN=10
+      - OPENTIP_FILE_CREATE_NOTE_FULL_REPORT=true
+      - OPENTIP_FILE_UPLOAD_UNSEEN_ARTIFACTS=false
+      - OPENTIP_IP_ADD_RELATIONSHIPS=false
+      - OPENTIP_DOMAIN_ADD_RELATIONSHIPS=false
+      - OPENTIP_URL_UPLOAD_UNSEEN=false
+      - OPENTIP_INCLUDE_ATTRIBUTES_IN_NOTE=false
+      - OPENTIP_ADD_CATEGORIES_LABELS=true
+      - OPENTIP_ADD_ZONE_LABELS=true
+      - OPENTIP_INDICATOR_ZONES=Red,Orange,Yellow
+    deploy:
+      mode: replicated
+      replicas: 1
+    restart: always
