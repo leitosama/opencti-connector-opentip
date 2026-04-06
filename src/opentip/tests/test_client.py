@@ -69,16 +69,50 @@ class OpenTIPClientTest(unittest.TestCase):
         )
 
     @patch("opentip.client.requests.Session")
-    def test_query_returns_none_on_http_error(self, mock_session):
-        mock_session.return_value.get.side_effect = requests.HTTPError("404 error")
+    def test_query_returns_none_on_400(self, mock_session):
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.raise_for_status.side_effect = requests.HTTPError("400 error")
+        mock_session.return_value.get.return_value = mock_response
 
         helper = MagicMock()
         client = OpenTIPClient(helper, "https://opentip.kaspersky.com", "test-token")
         result = client.get_ip_info("8.8.8.8")
 
         self.assertIsNone(result)
-        helper.log_error.assert_called()
+        helper.log_warning.assert_called()
         helper.metric.inc.assert_called_with("client_error_count")
+
+    @patch("opentip.client.requests.Session")
+    def test_query_returns_none_on_403(self, mock_session):
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_response.raise_for_status.side_effect = requests.HTTPError("403 error")
+        mock_session.return_value.get.return_value = mock_response
+
+        helper = MagicMock()
+        client = OpenTIPClient(helper, "https://opentip.kaspersky.com", "test-token")
+        result = client.get_ip_info("8.8.8.8")
+
+        self.assertIsNone(result)
+        helper.log_warning.assert_called()
+        helper.metric.inc.assert_called_with("client_error_count")
+
+    @patch("opentip.client.requests.Session")
+    def test_query_returns_none_on_404(self, mock_session):
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.raise_for_status.side_effect = requests.HTTPError("404 error")
+        mock_session.return_value.get.return_value = mock_response
+
+        helper = MagicMock()
+        client = OpenTIPClient(helper, "https://opentip.kaspersky.com", "test-token")
+        result = client.get_ip_info("8.8.8.8")
+
+        self.assertIsNone(result)
+        helper.log_info.assert_called()
+        calls = [c for c in helper.metric.inc.call_args_list if "client_error_count" in str(c)]
+        self.assertEqual(len(calls), 0)
 
     @patch("opentip.client.requests.Session")
     def test_query_returns_none_on_connection_error(self, mock_session):

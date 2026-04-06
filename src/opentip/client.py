@@ -53,6 +53,25 @@ class OpenTIPClient:
             response = http.get(
                 url, headers=self.headers | {"content-type": "application/json"}
             )
+
+            if response.status_code == 400:
+                self.helper.log_warning(
+                    f"[OpenTIP] Bad request (400): invalid query parameter for {url}"
+                )
+                self.helper.metric.inc("client_error_count")
+                return None
+            if response.status_code == 403:
+                self.helper.log_warning(
+                    "[OpenTIP] Forbidden (403): quota or request limit exceeded"
+                )
+                self.helper.metric.inc("client_error_count")
+                return None
+            if response.status_code == 404:
+                self.helper.log_info(
+                    f"[OpenTIP] Not found (404): no data available for this observable"
+                )
+                return None
+
             response.raise_for_status()
         except requests.exceptions.HTTPError as errh:
             self.helper.log_error(f"[OpenTIP] HTTP error: {errh}")
