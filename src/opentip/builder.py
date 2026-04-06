@@ -2,6 +2,7 @@
 """OpenTIP builder module."""
 import datetime
 from typing import List, Optional, Union
+from urllib.parse import quote
 
 import stix2
 from pycti import (
@@ -454,18 +455,9 @@ class OpenTIPBuilder:
         if not observable_value:
             return None
 
-        observable_value_encoded = observable_value.replace(" ", "%20")
+        observable_value_encoded = quote(observable_value, safe="")
 
-        if entity_type in ["StixFile", "Artifact"]:
-            return f"{self._API_URL}/{observable_value_encoded}/"
-        elif entity_type == "IPv4-Addr":
-            return f"{self._API_URL}/{observable_value}/"
-        elif entity_type in ["Domain-Name", "Hostname"]:
-            return f"{self._API_URL}/{observable_value}/"
-        elif entity_type == "Url":
-            return f"{self._API_URL}/{observable_value_encoded}/"
-
-        return None
+        return f"{self._API_URL}/{observable_value_encoded}/"
 
     def send_bundle(self) -> str:
         """
