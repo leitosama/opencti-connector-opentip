@@ -468,7 +468,7 @@ class OpenTIPBuilderTest(unittest.TestCase):
             observable["observable_value"],
             observable["entity_type"]
         )
-        expected = "https://opentip.kaspersky.com/ip-address/39.90.148.83/"
+        expected = "https://opentip.kaspersky.com/39.90.148.83/"
         self.assertEqual(url, expected)
 
     def test_build_external_reference_url_domain(self):

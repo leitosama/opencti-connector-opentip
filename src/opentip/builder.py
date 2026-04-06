@@ -459,7 +459,7 @@ class OpenTIPBuilder:
         if entity_type in ["StixFile", "Artifact"]:
             return f"{self._API_URL}/{observable_value_encoded}/"
         elif entity_type == "IPv4-Addr":
-            return f"{self._API_URL}/ip-address/{observable_value}/"
+            return f"{self._API_URL}/{observable_value}/"
         elif entity_type in ["Domain-Name", "Hostname"]:
             return f"{self._API_URL}/{observable_value}/"
         elif entity_type == "Url":

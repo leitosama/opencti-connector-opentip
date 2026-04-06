@@ -17,6 +17,14 @@ class OpenTIPConnector:
     _SOURCE_NAME = "OpenTIP"
     _API_URL = "https://opentip.kaspersky.com"
 
+    _ZONE_LABEL_COLORS = {
+        "opentip/red":    "#d32f2f",
+        "opentip/orange": "#f57c00",
+        "opentip/yellow": "#fbc02d",
+        "opentip/green":  "#388e3c",
+        "opentip/grey":   "#9e9e9e",
+    }
+
     def __init__(self, config: ConfigLoader, helper: OpenCTIConnectorHelper):
         self.config = config
         self.helper = helper
@@ -41,6 +49,14 @@ class OpenTIPConnector:
         self.ip_add_relationships = self.config.opentip.ip_add_relationships
         self.domain_add_relationships = self.config.opentip.domain_add_relationships
         self.indicator_zones = self.config.opentip.indicator_zones
+
+        if self.add_zone_labels:
+            self._init_zone_labels()
+
+    def _init_zone_labels(self):
+        """Pre-create OpenTIP zone labels in OpenCTI with their colours."""
+        for value, color in self._ZONE_LABEL_COLORS.items():
+            self.helper.api.label.read_or_create_unchecked(value=value, color=color)
 
     def resolve_default_value(self, stix_entity):
         if "hashes" in stix_entity and "SHA-256" in stix_entity["hashes"]:
