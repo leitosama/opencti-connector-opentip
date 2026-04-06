@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 """OpenTIP builder module."""
 import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import stix2
 from pycti import (
     STIX_EXT_OCTI_SCO,
-    AutonomousSystem,
     Indicator,
     Location,
     Note,
@@ -15,9 +14,14 @@ from pycti import (
     StixCoreRelationship,
 )
 
+from opentip.models.configs.opentip_configs import (
+    ConfigLoaderOpenTIP,
+)
 
 class OpenTIPBuilder:
     """OpenTIP builder."""
+
+    _API_URL = "https://opentip.kaspersky.com"
 
     _ZONE_SCORES = {
         "Red": 90,
@@ -53,9 +57,10 @@ class OpenTIPBuilder:
         self.bundle = stix_objects + [self.author]
         self.opencti_entity = opencti_entity
         self.stix_entity = stix_entity
-        self.attributes = data.get("attributes", {})
         self.data = data
         self.config = config
+        self.zone = data.get("Zone")
+        self.general_info = self._extract_general_info(data)
         self.score = self._compute_score(data)
         self.external_reference = None
 
@@ -64,7 +69,9 @@ class OpenTIPBuilder:
                 stix_entity, STIX_EXT_OCTI_SCO, "score", self.score
             )
 
-        link = self._extract_link(data.get("links", {}).get("self", ""))
+        observable_value = opencti_entity.get("observable_value", "")
+        entity_type = opencti_entity.get("entity_type", "")
+        link = self._build_external_reference_url(observable_value, entity_type)
         if link is not None:
             self.helper.log_debug(f"[OpenTIP] adding external reference {link}")
             self.external_reference = self._create_external_reference(
@@ -100,6 +107,31 @@ class OpenTIPBuilder:
             return None
 
         return self._ZONE_SCORES[zone]
+
+    def _extract_general_info(self, data: dict) -> dict:
+        """
+        Extract the general info section from the API response.
+
+        Parameters
+        ----------
+        data : dict
+            API response data.
+
+        Returns
+        -------
+        dict
+            The *GeneralInfo section, or empty dict if not found.
+        """
+        general_sections = [
+            "FileGeneralInfo",
+            "IpGeneralInfo",
+            "DomainGeneralInfo",
+            "UrlGeneralInfo",
+        ]
+        for section in general_sections:
+            if section in data and isinstance(data[section], dict):
+                return data[section]
+        return {}
 
     def _create_external_reference(
         self, url: str, description: str
@@ -174,15 +206,13 @@ class OpenTIPBuilder:
         pattern : str
             STIX pattern for the indicator.
         """
-        zone = self.attributes.get("Zone")
+        zone = self.zone
 
         if zone is None:
             return
 
         if zone not in indicator_zones:
             return
-
-        now_time = datetime.datetime.utcnow()
 
         now_time = datetime.datetime.utcnow()
         minutes = 2880
@@ -196,6 +226,7 @@ class OpenTIPBuilder:
             confidence=self.helper.connect_confidence_level,
             pattern=pattern,
             pattern_type="stix",
+            valid_from=self.helper.api.stix2.format_date(now_time),
             valid_until=self.helper.api.stix2.format_date(valid_until),
             external_references=(
                 [self.external_reference]
@@ -226,14 +257,9 @@ class OpenTIPBuilder:
 
     def create_asn_belongs_to(self):
         """Create AutonomousSystem and Relationship for IP."""
-        ip_general_info = self.data.get("IpGeneralInfo", {}) or self.data.get(
-            "IpGeneralInfo", {}
-        )
+        ip_whois = self.data.get("IpWhoIs", {}) or {}
+        asn_list = ip_whois.get("Asn", [])
 
-        if not ip_general_info:
-            return
-
-        asn_list = ip_general_info.get("Asn")
         if not asn_list or not isinstance(asn_list, list):
             return
 
@@ -242,14 +268,18 @@ class OpenTIPBuilder:
                 continue
 
             asn_number = asn_obj.get("Number")
-            asn_description = asn_obj.get("Description")
+            asn_description_list = asn_obj.get("Description")
 
             if not asn_number:
                 continue
 
             self.helper.log_debug(f"[OpenTIP] creating ASN {asn_number}")
 
-            as_stix = self._create_autonomous_system(asn_number, asn_description)
+            asn_name = None
+            if isinstance(asn_description_list, list) and asn_description_list:
+                asn_name = asn_description_list[0]
+
+            as_stix = self._create_autonomous_system(asn_number, asn_name)
             relationship = stix2.Relationship(
                 id=StixCoreRelationship.generate_id(
                     "belongs-to",
@@ -267,7 +297,8 @@ class OpenTIPBuilder:
 
     def create_location_located_at(self):
         """Create Location and Relationship for IP."""
-        country = self.data.get("CountryCode")
+        ip_general_info = self.general_info if self.general_info else {}
+        country = ip_general_info.get("CountryCode")
 
         if not country:
             return
@@ -313,7 +344,7 @@ class OpenTIPBuilder:
         if not self.config.add_zone_labels:
             return
 
-        zone = self.attributes.get("Zone")
+        zone = self.zone
         if not zone:
             return
 
@@ -327,49 +358,51 @@ class OpenTIPBuilder:
                 True,
             )
 
+    def _normalize_category_name(self, name: str) -> str:
+        """Normalize a category name for labeling.
+
+        Strips 'CATEGORY_' prefix (case-insensitive) and lowercases the remainder.
+        Examples:
+        - CATEGORY_MALWARE -> malware
+        - category_phishing -> phishing
+        - General -> general
+        """
+        name_lower = name.lower()
+        if name_lower.startswith("category_"):
+            return name_lower[9:]  # Remove 'category_' prefix
+        return name_lower
+
     def update_labels_with_categories(self):
         """Update labels based on categories."""
         if not self.config.add_categories_labels:
             return
 
-        categories = self.attributes.get("Categories", [])
-        categories_with_zone = (
-            self.attributes.get("CategoriesWithZone", [])
-            or self.attributes.get("CategoriesWithZone", [])
-        )
+        categories = self.general_info.get("CategoriesWithZone", [])
+        if not categories:
+            categories = self.general_info.get("Categories", [])
 
-        primary_category = None
-        primary_zone = None
+        if not categories or not isinstance(categories, list):
+            return
 
-        if categories_with_zone and isinstance(categories_with_zone, list):
-            zone_priority = {"Red": 4, "Orange": 3, "Yellow": 2, "Green": 1, "Grey": 0}
-            max_zone = "Grey"
-            for cat_zone in categories_with_zone:
-                zone = cat_zone.get("Zone", "Grey")
-                if zone_priority.get(zone, 0) > zone_priority.get(max_zone, 0):
-                    max_zone = zone
-                    primary_category = cat_zone.get("Name")
+        for cat_obj in categories:
+            if isinstance(cat_obj, dict):
+                category_name = cat_obj.get("Name", "")
+            elif isinstance(cat_obj, str):
+                category_name = cat_obj
+            else:
+                continue
 
-            if primary_category and max_zone != "Grey":
-                primary_zone = max_zone
+            if not category_name:
+                continue
 
-        elif categories and isinstance(categories, list):
-            if categories:
-                primary_category = categories[0]
+            normalized_name = self._normalize_category_name(category_name)
+            label = f"opentip/{normalized_name}"
 
-        if primary_category and primary_zone:
             OpenCTIStix2.put_attribute_in_extension(
                 self.stix_entity,
                 STIX_EXT_OCTI_SCO,
                 "labels",
-                f"opentip/category_{primary_category.lower()}",
-                True,
-            )
-            OpenCTIStix2.put_attribute_in_extension(
-                self.stix_entity,
-                STIX_EXT_OCTI_SCO,
-                "labels",
-                f"opentip/category_{primary_category.lower()}_{primary_zone.lower()}",
+                label,
                 True,
             )
 
@@ -402,32 +435,36 @@ class OpenTIPBuilder:
         """Create notes attributes content."""
         return ""
 
-    @staticmethod
-    def _extract_link(link: str) -> Optional[str]:
+    def _build_external_reference_url(self, observable_value: str, entity_type: str) -> Optional[str]:
         """
-        Extract the link for the external reference.
+        Build the external reference URL from the observable value and type.
 
         Parameters
         ----------
-        link : str
-            Original link from API response.
+        observable_value : str
+            The observable value (hash, IP, domain, or URL).
+        entity_type : str
+            The OpenCTI entity type.
 
         Returns
         -------
         str or None
-            Link to the OpenTIP GUI, if available.
+            URL to the OpenTIP GUI, or None if type is not supported.
         """
-        if not link:
+        if not observable_value:
             return None
 
-        for k, v in {
-            "hash": "hash",
-            "ip": "ip-address",
-            "domain": "domain",
-            "url": "url",
-        }.items():
-            if k in link:
-                return link.replace("/api/v1/search/", "/").replace(f"?request=", "/")
+        observable_value_encoded = observable_value.replace(" ", "%20")
+
+        if entity_type in ["StixFile", "Artifact"]:
+            return f"{self._API_URL}/{observable_value_encoded}/"
+        elif entity_type == "IPv4-Addr":
+            return f"{self._API_URL}/ip-address/{observable_value}/"
+        elif entity_type in ["Domain-Name", "Hostname"]:
+            return f"{self._API_URL}/{observable_value}/"
+        elif entity_type == "Url":
+            return f"{self._API_URL}/{observable_value_encoded}/"
+
         return None
 
     def send_bundle(self) -> str:

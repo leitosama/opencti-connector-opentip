@@ -57,12 +57,10 @@ class OpenTIPConnector:
         hash_value = self.resolve_default_value(stix_entity)
         json_data = self.client.get_hash_info(hash_value)
 
-        if not json_data or "error" in json_data:
-            if json_data and "error" in json_data:
-                raise ValueError(json_data["error"].get("message", "An error occurred"))
+        if not json_data:
             raise ValueError("An error has occurred.")
 
-        if "data" not in json_data or "attributes" not in json_data["data"]:
+        if "Zone" not in json_data:
             raise ValueError("An error has occurred.")
 
         builder = OpenTIPBuilder(
@@ -72,26 +70,27 @@ class OpenTIPConnector:
             stix_objects,
             stix_entity,
             opencti_entity,
-            json_data["data"],
+            json_data,
             self.config.opentip,
         )
 
         builder.update_labels_from_zone()
         builder.update_labels_with_categories()
 
+        file_general_info = json_data.get("FileGeneralInfo", {})
         if opencti_entity["entity_type"] == "StixFile":
-            if "Size" in builder.attributes:
-                stix_entity["size"] = builder.attributes.get("Size")
-            if "Sha256" in builder.attributes:
-                stix_entity["hashes"]["SHA-256"] = builder.attributes.get("Sha256")
-            if "Sha1" in builder.attributes:
-                stix_entity["hashes"]["SHA-1"] = builder.attributes.get("Sha1")
-            if "Md5" in builder.attributes:
-                stix_entity["hashes"]["MD5"] = builder.attributes.get("Md5")
-            if "Type" in builder.attributes:
-                stix_entity["name"] = builder.attributes.get("Type")
+            if "Size" in file_general_info:
+                stix_entity["size"] = file_general_info.get("Size")
+            if "Sha256" in file_general_info:
+                stix_entity["hashes"]["SHA-256"] = file_general_info.get("Sha256")
+            if "Sha1" in file_general_info:
+                stix_entity["hashes"]["SHA-1"] = file_general_info.get("Sha1")
+            if "Md5" in file_general_info:
+                stix_entity["hashes"]["MD5"] = file_general_info.get("Md5")
+            if "Type" in file_general_info:
+                stix_entity["name"] = file_general_info.get("Type")
 
-        sha256_hash = json_data["data"]["attributes"].get("Sha256", "")
+        sha256_hash = file_general_info.get("Sha256", "")
         builder.create_indicator_based_on_zone(
             self.indicator_zones,
             f"""[file:hashes.'SHA-256' = '{sha256_hash}']""",
@@ -102,12 +101,10 @@ class OpenTIPConnector:
     def _process_ip(self, stix_objects, stix_entity, opencti_entity):
         json_data = self.client.get_ip_info(opencti_entity["observable_value"])
 
-        if not json_data or "error" in json_data:
-            if json_data and "error" in json_data:
-                raise ValueError(json_data["error"].get("message", "An error occurred"))
+        if not json_data:
             raise ValueError("An error has occurred.")
 
-        if "data" not in json_data or "attributes" not in json_data["data"]:
+        if "Zone" not in json_data:
             raise ValueError("An error has occurred.")
 
         builder = OpenTIPBuilder(
@@ -117,7 +114,7 @@ class OpenTIPConnector:
             stix_objects,
             stix_entity,
             opencti_entity,
-            json_data["data"],
+            json_data,
             self.config.opentip,
         )
 
@@ -138,12 +135,10 @@ class OpenTIPConnector:
     def _process_domain(self, stix_objects, stix_entity, opencti_entity):
         json_data = self.client.get_domain_info(opencti_entity["observable_value"])
 
-        if not json_data or "error" in json_data:
-            if json_data and "error" in json_data:
-                raise ValueError(json_data["error"].get("message", "An error occurred"))
+        if not json_data:
             raise ValueError("An error has occurred.")
 
-        if "data" not in json_data or "attributes" not in json_data["data"]:
+        if "Zone" not in json_data:
             raise ValueError("An error has occurred.")
 
         builder = OpenTIPBuilder(
@@ -153,20 +148,9 @@ class OpenTIPConnector:
             stix_objects,
             stix_entity,
             opencti_entity,
-            json_data["data"],
+            json_data,
             self.config.opentip,
         )
-
-        if self.domain_add_relationships:
-            for ip in [
-                r["value"]
-                for r in json_data["data"]["attributes"].get("last_dns_records", [])
-                if r.get("type") == "A"
-            ]:
-                self.helper.log_debug(
-                    f'[OpenTIP] adding ip {ip} to domain {opencti_entity["observable_value"]}'
-                )
-                builder.create_ip_resolves_to(ip)
 
         builder.update_labels_from_zone()
         builder.update_labels_with_categories()
@@ -181,12 +165,10 @@ class OpenTIPConnector:
     def _process_url(self, stix_objects, stix_entity, opencti_entity):
         json_data = self.client.get_url_info(opencti_entity["observable_value"])
 
-        if not json_data or "error" in json_data:
-            if json_data and "error" in json_data:
-                raise ValueError(json_data["error"].get("message", "An error occurred"))
+        if not json_data:
             raise ValueError("An error has occurred.")
 
-        if "data" not in json_data or "attributes" not in json_data["data"]:
+        if "Zone" not in json_data:
             raise ValueError("An error has occurred.")
 
         builder = OpenTIPBuilder(
@@ -196,7 +178,7 @@ class OpenTIPConnector:
             stix_objects,
             stix_entity,
             opencti_entity,
-            json_data["data"],
+            json_data,
             self.config.opentip,
         )
 
