@@ -73,8 +73,11 @@ class OpenTIPConnector:
         hash_value = self.resolve_default_value(stix_entity)
         json_data = self.client.get_hash_info(hash_value)
 
-        if not json_data:
-            raise ValueError("An error has occurred.")
+        if json_data is None:
+            self.helper.log_info(
+                f"[OpenTIP] No data found in OpenTIP for observable {opencti_entity['observable_value']}"
+            )
+            return f"No data found in OpenTIP for observable {opencti_entity['observable_value']}"
 
         if "Zone" not in json_data:
             raise ValueError("An error has occurred.")
@@ -117,8 +120,11 @@ class OpenTIPConnector:
     def _process_ip(self, stix_objects, stix_entity, opencti_entity):
         json_data = self.client.get_ip_info(opencti_entity["observable_value"])
 
-        if not json_data:
-            raise ValueError("An error has occurred.")
+        if json_data is None:
+            self.helper.log_info(
+                f"[OpenTIP] No data found in OpenTIP for observable {opencti_entity['observable_value']}"
+            )
+            return f"No data found in OpenTIP for observable {opencti_entity['observable_value']}"
 
         if "Zone" not in json_data:
             raise ValueError("An error has occurred.")
@@ -151,8 +157,11 @@ class OpenTIPConnector:
     def _process_domain(self, stix_objects, stix_entity, opencti_entity):
         json_data = self.client.get_domain_info(opencti_entity["observable_value"])
 
-        if not json_data:
-            raise ValueError("An error has occurred.")
+        if json_data is None:
+            self.helper.log_info(
+                f"[OpenTIP] No data found in OpenTIP for observable {opencti_entity['observable_value']}"
+            )
+            return f"No data found in OpenTIP for observable {opencti_entity['observable_value']}"
 
         if "Zone" not in json_data:
             raise ValueError("An error has occurred.")
@@ -181,8 +190,11 @@ class OpenTIPConnector:
     def _process_url(self, stix_objects, stix_entity, opencti_entity):
         json_data = self.client.get_url_info(opencti_entity["observable_value"])
 
-        if not json_data:
-            raise ValueError("An error has occurred.")
+        if json_data is None:
+            self.helper.log_info(
+                f"[OpenTIP] No data found in OpenTIP for observable {opencti_entity['observable_value']}"
+            )
+            return f"No data found in OpenTIP for observable {opencti_entity['observable_value']}"
 
         if "Zone" not in json_data:
             raise ValueError("An error has occurred.")
@@ -240,9 +252,6 @@ class OpenTIPConnector:
                 return self._process_domain(stix_objects, stix_entity, opencti_entity)
             case "Url":
                 return self._process_url(stix_objects, stix_entity, opencti_entity)
-            case "IPv6-Addr":
-                self.helper.log_warning("[OpenTIP] IPv6-Addr not supported yet")
-                return "IPV6 not supported"
             case _:
                 raise ValueError(
                     f'{opencti_entity["entity_type"]} is not a supported entity type.'

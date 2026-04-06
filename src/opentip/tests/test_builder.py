@@ -514,7 +514,7 @@ class OpenTIPBuilderTest(unittest.TestCase):
             observable["observable_value"],
             observable["entity_type"]
         )
-        expected = "https://opentip.kaspersky.com/https://example.com/path/"
+        expected = "https://opentip.kaspersky.com/https%3A%2F%2Fexample.com%2Fpath/"
         self.assertEqual(url, expected)
 
     def test_build_external_reference_url_no_observable(self):
